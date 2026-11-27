@@ -9,34 +9,36 @@ datasource db {
 }
 
 model Project {
- id String @id @default(cuid())
- slug String @unique
- title String
- category String
- region String?
- description String @db.Text
- published Boolean @default(false)
- createdAt DateTime @default(now())
- updatedAt DateTime @updatedAt
- images ProjectImage[]
+  id          String         @id @default(cuid())
+  slug        String         @unique
+  title       String
+  category    String
+  region      String?
+  description String         @db.Text
+  published   Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  images      ProjectImage[]
 }
+
 model ProjectImage {
- id String @id @default(cuid())
- projectId String
- project Project @relation(fields:[projectId], references:[id], onDelete:Cascade)
- url String
- alt String
- sort Int @default(0)
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String
+  sort      Int     @default(0)
 }
+
 model Inquiry {
- id String @id @default(cuid())
- name String
- phone String
- region String?
- category String?
- dimensions String?
- message String @db.Text
- attachmentKeys String[]
- status String @default("NEW")
- createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  name           String
+  phone          String
+  region         String?
+  category       String?
+  dimensions     String?
+  message        String   @db.Text
+  attachmentKeys String[]
+  status         String   @default("NEW")
+  createdAt      DateTime @default(now())
 }
