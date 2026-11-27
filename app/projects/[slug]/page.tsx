@@ -1,0 +1,3 @@
+import {notFound} from 'next/navigation';import {db} from '@/lib/db';
+export const dynamic='force-dynamic';
+export default async function Detail({params}:{params:Promise<{slug:string}>}){const {slug}=await params;let project;try{project=await db.project.findUnique({where:{slug,published:true},include:{images:{orderBy:{sort:'asc'}}}})}catch{}if(!project)notFound();return <main className="section wrap"><div className="eyebrow">{project.category} · {project.region}</div><h2>{project.title}</h2><p className="muted">{project.description}</p>{project.images.map(i=><figure key={i.id} style={{margin:'20px 0'}}><img className="detail-image" src={i.url} alt={i.alt}/></figure>)}</main>}

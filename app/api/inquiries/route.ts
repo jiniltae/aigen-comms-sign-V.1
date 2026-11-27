@@ -1,0 +1,3 @@
+import {NextRequest,NextResponse} from 'next/server';import {z} from 'zod';import {db} from '@/lib/db';
+const schema=z.object({name:z.string().trim().min(1).max(80),phone:z.string().regex(/^[0-9+()\-\s]{7,30}$/),region:z.string().max(100).optional(),category:z.string().max(50).optional(),dimensions:z.string().max(100).optional(),message:z.string().trim().min(1).max(3000)});
+export async function POST(req:NextRequest){try{const data=schema.safeParse(await req.json());if(!data.success)return NextResponse.json({error:'Invalid input'},{status:400});await db.inquiry.create({data:{...data.data,attachmentKeys:[]}});return NextResponse.json({ok:true},{status:201})}catch{return NextResponse.json({error:'Unable to submit'},{status:503})}}
