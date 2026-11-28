@@ -63,6 +63,12 @@ where: {
           </div>
 
           <div className="home-hero-content">
+            <div className="home-hero-art" aria-hidden="true">
+              <span className="home-hero-art-grid" />
+              <span className="home-hero-art-frame" />
+              <span className="home-hero-art-bar" />
+              <span className="home-hero-art-caption">FORM FOLLOWS IDENTITY — AIGEN / 2026</span>
+            </div>
             <p className="home-hero-label">
               AIGEN COMMS — CREATIVE SIGNAGE STUDIO
             </p>
@@ -84,9 +90,12 @@ where: {
                 브랜드의 가치를 공간에 구현합니다.
               </p>
 
-              <Link href="/quote" className="home-hero-button">
-                프로젝트 문의하기 <span>↗</span>
-              </Link>
+              <div className="home-hero-actions">
+                <Link href="/projects" className="home-hero-secondary">시공 사례 보기 <span aria-hidden="true">↗</span></Link>
+                <Link href="/quote" className="home-hero-button">
+                  프로젝트 문의하기 <span aria-hidden="true">↗</span>
+                </Link>
+              </div>
             </div>
           </div>
 
@@ -143,9 +152,10 @@ where: {
             브랜드와 설치 환경에 맞는 간판을 제안합니다.
           </p>
 
-          <div className="home-service-list">
+          <div className="home-service-list" aria-label="간판 제작 서비스">
             {categories.slice(1).map((category, index) => (
               <Link
+                aria-label={`${category} 시공 사례 보기`}
                 href={
                   '/projects?category=' +
                   encodeURIComponent(category)
@@ -192,6 +202,7 @@ where: {
       <Link
         key={project.slug}
         href={'/projects/' + project.slug}
+        aria-label={`${project.title} 시공 사례 상세 보기`}
         className={
           'home-work-card ' +
           (index === 0 ? 'home-work-featured' : '')
@@ -203,6 +214,7 @@ where: {
               src={project.image}
               alt={project.title}
               loading="lazy"
+              decoding="async"
             />
           ) : (
             <div className="home-work-placeholder">
