@@ -315,24 +315,4 @@ export default async function Detail({
     aspect-ratio: 1 / 1;
   }
 
-  .detail-figure figcaption {
-    font-size: 11px;
-  }
-
-  .detail-description {
-    padding: 50px 0;
-  }
-
-  .detail-description-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .detail-description p {
-    font-size: 15px;
-    line-height: 1.85;
-  }
-
-  .detail-bottom {
-    padding: 55px 0;
-  }
 }
