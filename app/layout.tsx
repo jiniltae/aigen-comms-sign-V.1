@@ -1,6 +1,7 @@
 
 import './globals.css';
 import Link from 'next/link';
+import MobileNav from './components/MobileNav';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default function Layout({
   return (
     <html lang="ko">
       <body>
+        <a className="skip-to-content" href="#main-content">본문으로 바로가기</a>
         <header className="site-header">
           <div className="wrap nav">
             <Link className="brand" href="/" aria-label="아이젠컴즈 홈">
@@ -37,6 +39,7 @@ export default function Layout({
                 견적 문의 <span aria-hidden="true">↗</span>
               </Link>
             </nav>
+            <MobileNav />
           </div>
         </header>
 
