@@ -30,6 +30,7 @@ type Inquiry = {
   dimensions: string | null;
   message: string;
   status: string;
+  attachmentKeys: string[];
   createdAt: string;
 };
 
@@ -58,6 +59,74 @@ const buttonStyle = {
   borderRadius: 5,
   cursor: 'pointer',
 };
+
+
+function InquiryPhotos({ inquiry }: { inquiry: Inquiry }) {
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState(false);
+  const count = inquiry.attachmentKeys?.length ?? 0;
+
+  async function showPhotos() {
+    if (expanded) {
+      setExpanded(false);
+      setPhotos([]);
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch(
+        `/api/admin/inquiries/${encodeURIComponent(inquiry.id)}/photos`,
+        { cache: 'no-store' }
+      );
+      if (!response.ok) throw new Error('사진을 불러올 수 없습니다. 다시 로그인하거나 잠시 후 재시도해 주세요.');
+      const data: { urls?: string[] } = await response.json();
+      if (!Array.isArray(data.urls)) throw new Error('사진 응답이 올바르지 않습니다.');
+      setPhotos(data.urls);
+      setExpanded(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '사진 조회 실패');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ margin: '16px 0', padding: 16, border: '1px solid #e4e4e4', borderRadius: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <strong>현장 첨부 사진 ({count}장)</strong>
+        {count > 0 && (
+          <button type="button" onClick={() => void showPhotos()} disabled={loading}
+            style={{ padding: '9px 14px', border: '1px solid #171717', borderRadius: 4, background: '#171717', color: '#fff', cursor: 'pointer' }}>
+            {loading ? '사진 불러오는 중...' : expanded ? '사진 닫기' : '사진 보기'}
+          </button>
+        )}
+      </div>
+      {count === 0 && <p className="muted" style={{ marginTop: 8 }}>첨부된 사진이 없습니다.</p>}
+      {error && <p role="alert" style={{ color: '#c62828', marginTop: 10 }}>{error}</p>}
+      {expanded && (
+        <>
+          <p className="muted" style={{ marginTop: 10, fontSize: 12 }}>
+            비공개 사진의 임시 조회 주소입니다. 만료되면 닫았다가 다시 열어주세요.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, marginTop: 12 }}>
+            {photos.map((url, index) => (
+              <a key={`${inquiry.id}-${index}`} href={url} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'block', color: '#171717', textDecoration: 'none' }} title="원본 사진 새 창으로 보기">
+                <img src={url} alt={`${inquiry.name}님 현장 사진 ${index + 1}`}
+                  loading="lazy" referrerPolicy="no-referrer"
+                  style={{ width: '100%', aspectRatio: '4 / 3', objectFit: 'cover', borderRadius: 4, background: '#f3f3f3', display: 'block' }} />
+                <span style={{ display: 'block', marginTop: 6, fontSize: 12 }}>사진 {index + 1} · 크게 보기 ↗</span>
+              </a>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function Admin() {
   const [authorized, setAuthorized] = useState(false);
@@ -602,7 +671,7 @@ export default function Admin() {
   return (
     <main className="section wrap">
       <div className="eyebrow">AIGEN COMMS ADMIN</div>
-      <h2>관리자 대시보드 V5</h2>
+      <h2>관리자 대시보드 V6</h2>
 
       <nav style={{
         display: 'flex',
@@ -971,6 +1040,8 @@ export default function Admin() {
                 <strong>문의 내용</strong>
                 <p>{inquiry.message}</p>
               </div>
+
+              <InquiryPhotos inquiry={inquiry} />
 
               <label htmlFor={`status-${inquiry.id}`}>
                 처리 상태
