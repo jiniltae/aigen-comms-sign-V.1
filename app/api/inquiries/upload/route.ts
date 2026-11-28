@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
       Bucket: INQUIRY_R2_BUCKET,
       Key: key,
       ContentType: ALLOWED_TYPE,
+      ContentLength: size,
     });
 
     const uploadUrl = await getSignedUrl(s3, command, {
