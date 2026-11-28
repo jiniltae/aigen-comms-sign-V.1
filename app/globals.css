@@ -53,3 +53,176 @@ button:disabled{opacity:.55;cursor:not-allowed}
 @media(max-width:750px){.nav{min-height:70px}.brand{font-size:21px}.navlinks{gap:12px;font-size:12px}.navlinks a:nth-child(2){display:none}.grid{grid-template-columns:1fr}.hero{min-height:460px}.hero h1{letter-spacing:-.045em}.section{padding-block:60px}.form{padding:22px}.project img{height:260px}.footer{padding:52px 0}}
 @media(max-width:390px){.wrap{padding-inline:16px}.navlinks{gap:9px;font-size:11px}.brand{font-size:19px}.hero h1{font-size:40px}.project img{height:220px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
+
+/* AIGEN COMMS - Header & Footer */
+
+.site-header {
+  background: #fff;
+  border-bottom: 1px solid #ebebe8;
+  position: relative;
+  z-index: 20;
+}
+
+.site-header .nav {
+  min-height: 82px;
+  height: auto;
+}
+
+.brand {
+  font-size: 25px;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  white-space: nowrap;
+}
+
+.brand-accent {
+  color: #ff5a36;
+}
+
+.navlinks {
+  display: flex;
+  align-items: center;
+  gap: 34px;
+}
+
+.navlinks a {
+  transition: color .2s ease;
+}
+
+.navlinks a:hover {
+  color: #ff5a36;
+}
+
+.navlinks .nav-contact {
+  background: #171717;
+  color: #fff;
+  padding: 13px 20px;
+  font-weight: 700;
+}
+
+.navlinks .nav-contact:hover {
+  background: #ff5a36;
+  color: #fff;
+}
+
+.footer {
+  background: #151515;
+  color: #fff;
+  padding: 76px 0 26px;
+}
+
+.footer-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 50px;
+  padding-bottom: 72px;
+}
+
+.footer-brand {
+  display: inline-block;
+  font-size: clamp(25px, 3vw, 36px);
+  font-weight: 900;
+  letter-spacing: -1.5px;
+}
+
+.footer-intro p {
+  margin-top: 20px;
+  color: #aaa;
+  line-height: 1.9;
+  font-size: 14px;
+}
+
+.footer-links {
+  display: flex;
+  gap: clamp(40px, 7vw, 110px);
+}
+
+.footer-links > div {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.footer-links strong {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #888;
+  margin-bottom: 12px;
+}
+
+.footer-links a,
+.footer-links span {
+  font-size: 14px;
+  color: #ddd;
+}
+
+.footer-links a:hover {
+  color: #ff5a36;
+}
+
+.footer-bottom {
+  border-top: 1px solid #333;
+  padding-top: 24px;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  color: #888;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+@media (max-width: 750px) {
+  .site-header .nav {
+    min-height: 70px;
+    gap: 16px;
+  }
+
+  .brand {
+    font-size: 19px;
+  }
+
+  .navlinks {
+    gap: 14px;
+    font-size: 12px;
+  }
+
+  .navlinks a:nth-child(2) {
+    display: inline;
+  }
+
+  .navlinks .nav-contact {
+    padding: 10px 12px;
+  }
+
+  .footer {
+    padding: 55px 0 24px;
+  }
+
+  .footer-top {
+    flex-direction: column;
+    gap: 36px;
+    padding-bottom: 45px;
+  }
+
+  .footer-links {
+    gap: 55px;
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 420px) {
+  .site-header .nav {
+    flex-wrap: wrap;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .navlinks {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
