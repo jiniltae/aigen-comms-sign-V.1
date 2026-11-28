@@ -876,3 +876,263 @@ button:disabled{opacity:.55;cursor:not-allowed}
     align-items: flex-start;
   }
 }
+
+/* ======================================
+   AIGEN COMMS - PROJECT DETAIL V2
+====================================== */
+
+.detail-page {
+  background: #fff;
+}
+
+.detail-header {
+  background: #f5f5f3;
+  padding: 85px 0 60px;
+}
+
+.detail-header-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 35px;
+  margin: 45px 0 65px;
+}
+
+.detail-category {
+  font-size: 12px;
+  color: #ff5a36;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 18px;
+}
+
+.detail-header h1 {
+  font-size: clamp(42px, 6vw, 85px);
+  font-weight: 900;
+  letter-spacing: -.065em;
+  line-height: 1.12;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.detail-back-link {
+  border-bottom: 1px solid #171717;
+  padding-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.detail-back-link:hover {
+  color: #ff5a36;
+}
+
+.detail-info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  border-top: 1px solid #ccc;
+  padding-top: 25px;
+}
+
+.detail-info-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-info-grid span {
+  color: #999;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+}
+
+.detail-info-grid strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* GALLERY */
+.detail-gallery {
+  padding: 75px 0 100px;
+}
+
+.detail-gallery-list {
+  display: grid;
+  gap: 65px;
+}
+
+.detail-figure {
+  margin: 0;
+}
+
+.detail-image-frame {
+  width: 100%;
+  background: #f0f0ed;
+  overflow: hidden;
+}
+
+.detail-image-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 850px;
+  object-fit: contain;
+}
+
+.detail-figure figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 16px;
+  font-size: 12px;
+  color: #888;
+}
+
+.detail-no-images {
+  min-height: 350px;
+  background: #f5f5f3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+}
+
+.detail-no-images strong {
+  font-size: 24px;
+  letter-spacing: -1px;
+}
+
+.detail-no-images p {
+  color: #999;
+  font-size: 14px;
+}
+
+/* DESCRIPTION */
+.detail-description {
+  background: #f5f5f3;
+  padding: 95px 0;
+}
+
+.detail-description-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 40px;
+}
+
+.detail-description h2 {
+  font-size: clamp(38px, 5vw, 65px);
+  line-height: 1;
+  letter-spacing: -.065em;
+  margin: 0 0 35px;
+}
+
+.detail-description h2 span {
+  color: #ff5a36;
+}
+
+.detail-description p {
+  font-size: 16px;
+  line-height: 2;
+  color: #555;
+  white-space: pre-line;
+  max-width: 750px;
+}
+
+/* BOTTOM */
+.detail-bottom {
+  background: #171717;
+  color: #fff;
+  padding: 95px 0;
+}
+
+.detail-bottom h2 {
+  font-size: clamp(52px, 8vw, 110px);
+  font-weight: 900;
+  letter-spacing: -.075em;
+  line-height: .98;
+  margin: 40px 0 65px;
+}
+
+.detail-bottom h2 span {
+  color: #ff5a36;
+}
+
+.detail-bottom-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 25px;
+}
+
+.detail-list-button {
+  color: #ccc;
+  font-size: 14px;
+  border-bottom: 1px solid #777;
+  padding-bottom: 10px;
+}
+
+.detail-list-button:hover {
+  color: #fff;
+}
+
+.detail-quote-button {
+  background: #ff5a36;
+  color: #fff;
+  padding: 20px 30px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.detail-quote-button:hover {
+  background: #e64825;
+}
+
+/* MOBILE */
+@media (max-width: 750px) {
+  .detail-header {
+    padding: 65px 0 45px;
+  }
+
+  .detail-header-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 25px;
+    margin: 35px 0 45px;
+  }
+
+  .detail-info-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 30px;
+  }
+
+  .detail-gallery {
+    padding: 40px 0 65px;
+  }
+
+  .detail-gallery-list {
+    gap: 40px;
+  }
+
+  .detail-figure figcaption {
+    font-size: 11px;
+  }
+
+  .detail-description {
+    padding: 65px 0;
+  }
+
+  .detail-description-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-bottom {
+    padding: 70px 0;
+  }
+
+  .detail-bottom-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
