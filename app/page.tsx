@@ -7,8 +7,48 @@ import { categories } from '@/lib/data';
 export const dynamic = 'force-dynamic';
 
 
-export default function Home() {
+
+export default async function Home() {
+  let projects: {
+    slug: string;
+    title: string;
+    category: string;
+    region: string | null;
+    image: string;
+  }[] = [];
+
+  try {
+    const rows = await db.project.findMany({
+      where: {
+        published: true,
+      },
+      include: {
+        images: {
+          orderBy: {
+            sort: 'asc',
+          },
+          take: 1,
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 4,
+    });
+
+    projects = rows.map((project) => ({
+      slug: project.slug,
+      title: project.title,
+      category: project.category,
+      region: project.region,
+      image: project.images[0]?.url || '',
+    }));
+  } catch (error) {
+    console.error('Failed to load homepage projects:', error);
+  }
+
   return (
+
     <>
       {/* HERO */}
       <section className="home-hero">
@@ -141,46 +181,58 @@ export default function Home() {
             </Link>
           </div>
 
-          <p className="home-sample-notice">
-            현재 표시된 이미지는 디자인 확인용 샘플이며,
-            실제 시공 사례가 아닙니다.
-          </p>
 
-          <div className="home-work-grid">
-            {samples.slice(0, 4).map((project, index) => (
-              <Link
-                key={project.slug}
-                href={'/projects/' + project.slug}
-                className={
-                  'home-work-card ' +
-                  (index === 0 ? 'home-work-featured' : '')
-                }
-              >
-                <div className="home-work-image">
-                  <img
-                    src={project.image}
-                    alt={project.title}
-                    loading="lazy"
-                  />
-                  <span className="home-work-image-arrow">
-                    ↗
-                  </span>
-                </div>
+{projects.length > 0 ? (
+  <div className="home-work-grid">
+    {projects.map((project, index) => (
+      <Link
+        key={project.slug}
+        href={'/projects/' + project.slug}
+        className={
+          'home-work-card ' +
+          (index === 0 ? 'home-work-featured' : '')
+        }
+      >
+        <div className="home-work-image">
+          {project.image ? (
+            <img
+              src={project.image}
+              alt={project.title}
+              loading="lazy"
+            />
+          ) : (
+            <div className="home-work-placeholder">
+              AIGEN COMMS
+            </div>
+          )}
 
-                <div className="home-work-meta">
-                  <div>
-                    <small>
-                      {project.category} / {project.region}
-                    </small>
-                    <h3>{project.title}</h3>
-                  </div>
-                  <span>
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                </div>
-              </Link>
-            ))}
+          <span className="home-work-image-arrow">
+            ↗
+          </span>
+        </div>
+
+        <div className="home-work-meta">
+          <div>
+            <small>
+              {project.category}
+              {project.region ? ` / ${project.region}` : ''}
+            </small>
+            <h3>{project.title}</h3>
           </div>
+
+          <span>
+            {String(index + 1).padStart(2, '0')}
+          </span>
+        </div>
+      </Link>
+    ))}
+  </div>
+) : (
+  <div className="home-works-empty">
+    <p>등록된 시공 사례가 아직 없습니다.</p>
+    <span>새로운 프로젝트를 준비하고 있습니다.</span>
+  </div>
+)}
 
           <div className="home-works-more">
             <Link href="/projects" className="home-outline-button">
