@@ -1,3 +1,4 @@
+import { notifyNewInquiry } from '@/lib/inquiry-notification';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
     if (!saved) return NextResponse.json({ error: 'Session already submitted' }, { status: 409 });
     // Deleting temporary objects is best effort. Lifecycle rule also cleans up leftovers.
     await Promise.allSettled(keys.map(key => s3!.send(new DeleteObjectCommand({ Bucket: bucket!, Key: key }))));
+    await notifyNewInquiry({ name: data.name, phone: data.phone, region: data.region, category: data.category, dimensions: data.dimensions, message: data.message, attachmentCount: confirmed.length });
     const response = NextResponse.json({ ok: true }, { status: 201 });
     response.cookies.delete('aigen_inquiry_upload');
     return response;

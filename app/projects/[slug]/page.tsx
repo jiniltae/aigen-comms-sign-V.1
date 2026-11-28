@@ -1,9 +1,22 @@
+import type { Metadata } from 'next';
 
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  try {
+    const project = await db.project.findFirst({ where: { slug, published: true }, include: { images: { orderBy: { sort: 'asc' }, take: 1 } } });
+    if (!project) return { title: '시공 사례를 찾을 수 없습니다', robots: { index: false, follow: false } };
+    const description = (project.description?.trim() || `${project.category} 간판 디자인·제작·시공 사례${project.region ? ` · ${project.region}` : ''}`).slice(0, 160);
+    return { title: project.title, description, alternates: { canonical: `/projects/${encodeURIComponent(slug)}` },
+      openGraph: { type: 'article', title: project.title, description, images: project.images[0]?.url ? [{ url: project.images[0].url, alt: project.title }] : [] } };
+  } catch { return { title: '간판 시공 사례' }; }
+}
+
 
 export default async function Detail({
   params,

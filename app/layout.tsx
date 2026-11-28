@@ -3,17 +3,20 @@ import './globals.css';
 import Link from 'next/link';
 import MobileNav from './components/MobileNav';
 import type { Metadata } from 'next';
+import { SITE_URL, SITE_DESCRIPTION, SITE_NAME } from '@/lib/site';
 
 export const metadata: Metadata = {
-  title: {
-    default: 'AIGEN COMMS | 간판 제작·시공 전문',
-    template: '%s | AIGEN COMMS',
-  },
-  description:
-    '아이젠컴즈 간판 제작·시공 전문. 채널간판, 스카시간판, 플렉스간판, 갈바간판 시공 사례와 견적 문의.',
-  robots: {
-    index: true,
-    follow: true,
+  metadataBase: new URL(SITE_URL),
+  title: { default: 'AIGEN COMMS | 간판 디자인·제작·시공', template: '%s | AIGEN COMMS' },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  alternates: { canonical: '/' },
+  openGraph: { type: 'website', locale: 'ko_KR', siteName: SITE_NAME, title: 'AIGEN COMMS | 간판 디자인·제작·시공', description: SITE_DESCRIPTION, url: SITE_URL },
+  twitter: { card: 'summary_large_image', title: 'AIGEN COMMS | 간판 디자인·제작·시공', description: SITE_DESCRIPTION },
+  robots: { index: true, follow: true },
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
+    other: process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION ? { 'naver-site-verification': process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION } : undefined,
   },
 };
 
@@ -25,6 +28,11 @@ export default function Layout({
   return (
     <html lang="ko">
       <body>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          '@context': 'https://schema.org', '@type': 'Organization',
+          name: '아이젠컴즈', alternateName: 'AIGEN COMMS', url: SITE_URL,
+          description: SITE_DESCRIPTION,
+        }).replace(/</g, '\\u003c') }} />
         <a className="skip-to-content" href="#main-content">본문으로 바로가기</a>
         <header className="site-header">
           <div className="wrap nav">

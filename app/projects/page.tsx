@@ -1,9 +1,11 @@
+import type { Metadata } from 'next';
 
 import Link from 'next/link';
 import { db } from '@/lib/db';
 import { categories } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: '간판 시공 사례', description: '아이젠컴즈의 채널간판, 스카시, 플렉스, 갈바간판 제작·시공 포트폴리오를 확인하세요.', alternates: { canonical: '/projects' } };
 
 type ProjectItem = {
   slug: string;

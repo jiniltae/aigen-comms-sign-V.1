@@ -1,1 +1,16 @@
-import type {MetadataRoute} from 'next';import {db} from '@/lib/db';export default async function sitemap():Promise<MetadataRoute.Sitemap>{const base=process.env.NEXT_PUBLIC_SITE_URL||'https://example.com';let slugs:string[]=[];try{slugs=(await db.project.findMany({where:{published:true},select:{slug:true}})).map(x=>x.slug)}catch{}return ['','/projects','/quote',...slugs.map(s=>'/projects/'+s)].map(x=>({url:base+x,lastModified:new Date()}))}
+import type { MetadataRoute } from 'next';
+import { db } from '@/lib/db';
+import { absoluteUrl } from '@/lib/site';
+export const dynamic = 'force-dynamic';
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const pages: MetadataRoute.Sitemap = [
+    { url: absoluteUrl('/'), changeFrequency: 'weekly', priority: 1 },
+    { url: absoluteUrl('/projects'), changeFrequency: 'weekly', priority: 0.9 },
+    { url: absoluteUrl('/quote'), changeFrequency: 'monthly', priority: 0.7 },
+  ];
+  try {
+    const projects = await db.project.findMany({ where: { published: true }, select: { slug: true, createdAt: true } });
+    for (const project of projects) pages.push({ url: absoluteUrl(`/projects/${encodeURIComponent(project.slug)}`), lastModified: project.createdAt, changeFrequency: 'monthly', priority: 0.8 });
+  } catch (error) { console.error('Sitemap project query failed:', error); }
+  return pages;
+}
