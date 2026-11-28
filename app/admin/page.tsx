@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
-type ProjectImage = {
+type Photo = {
   id?: string;
   url: string;
   alt: string;
@@ -18,8 +18,23 @@ type Project = {
   region: string | null;
   description: string;
   published: boolean;
-  images: ProjectImage[];
+  images: Photo[];
 };
+
+type Inquiry = {
+  id: string;
+  name: string;
+  phone: string;
+  region: string | null;
+  category: string | null;
+  dimensions: string | null;
+  message: string;
+  status: string;
+  createdAt: string;
+};
+
+type Tab = 'dashboard' | 'projects' | 'inquiries';
+type PhotoTarget = 'new' | 'edit';
 
 const categories = [
   '채널간판',
@@ -31,39 +46,77 @@ const categories = [
   '실내사인',
 ];
 
+const statusNames: Record<string, string> = {
+  NEW: '신규',
+  IN_PROGRESS: '상담 중',
+  DONE: '완료',
+};
+
+const buttonStyle = {
+  padding: '10px 14px',
+  border: '1px solid #ccc',
+  borderRadius: 5,
+  cursor: 'pointer',
+};
+
 export default function Admin() {
+  const [authorized, setAuthorized] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [authorized, setAuthorized] = useState(false);
+  const [tab, setTab] = useState<Tab>('dashboard');
   const [message, setMessage] = useState('');
-  const [items, setItems] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [editing, setEditing] = useState<Project | null>(null);
-
-  const [newImages, setNewImages] = useState<ProjectImage[]>([]);
-  const [editImages, setEditImages] = useState<ProjectImage[]>([]);
-
+  const [newPhotos, setNewPhotos] = useState<Photo[]>([]);
+  const [editPhotos, setEditPhotos] = useState<Photo[]>([]);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
-  async function load() {
+  async function loadData(silent = false) {
     try {
-      const r = await fetch('/api/admin/projects', {
-        cache: 'no-store',
-      });
+      const [p, i] = await Promise.all([
+        fetch('/api/admin/projects', { cache: 'no-store' }),
+        fetch('/api/admin/inquiries', { cache: 'no-store' }),
+      ]);
 
-      if (r.status === 401) {
+      if (p.status === 401 || i.status === 401) {
         setAuthorized(false);
-        setMessage('로그인이 만료되었습니다.');
+        if (!silent) setMessage('로그인이 필요합니다.');
         return;
       }
 
-      if (!r.ok) throw new Error('목록 조회 실패');
+      if (!p.ok || !i.ok) {
+        throw new Error('관리자 데이터를 불러오지 못했습니다.');
+      }
 
-      setItems(await r.json());
-    } catch {
-      setMessage('시공 사례 목록을 불러오지 못했습니다.');
+      const [projectData, inquiryData] = await Promise.all([
+        p.json(),
+        i.json(),
+      ]);
+
+      setProjects(projectData);
+      setInquiries(inquiryData);
+      setAuthorized(true);
+    } catch (error) {
+      if (!silent) {
+        setMessage(
+          error instanceof Error ? error.message : '조회 실패'
+        );
+      }
     }
   }
+
+  useEffect(() => {
+    async function initialize() {
+      await loadData(true);
+      setChecking(false);
+    }
+    void initialize();
+  }, []);
 
   async function login(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -76,15 +129,16 @@ export default function Admin() {
         body: JSON.stringify({ email, password }),
       });
 
-      setAuthorized(r.ok);
-      setMessage(r.ok ? '로그인 성공' : '로그인 실패');
+      if (!r.ok) throw new Error('이메일 또는 비밀번호를 확인하세요.');
 
-      if (r.ok) {
-        setPassword('');
-        await load();
-      }
-    } catch {
-      setMessage('서버 연결 실패');
+      setPassword('');
+      setAuthorized(true);
+      await loadData();
+      setMessage('로그인 성공');
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : '로그인 실패'
+      );
     } finally {
       setBusy(false);
     }
@@ -92,18 +146,17 @@ export default function Admin() {
 
   async function uploadFiles(
     files: FileList,
-    target: 'new' | 'edit'
+    target: PhotoTarget
   ) {
-    const current = target === 'new' ? newImages : editImages;
+    const current = target === 'new' ? newPhotos : editPhotos;
 
     if (current.length + files.length > 30) {
-      setMessage('사진은 최대 30장까지 등록할 수 있습니다.');
+      setMessage('사진은 최대 30장까지 가능합니다.');
       return;
     }
 
     setUploading(true);
-
-    const uploaded: ProjectImage[] = [];
+    const uploaded: Photo[] = [];
 
     try {
       for (const file of Array.from(files)) {
@@ -112,9 +165,7 @@ export default function Admin() {
           file.size === 0 ||
           file.size > 8 * 1024 * 1024
         ) {
-          throw new Error(
-            `${file.name}: JPG, PNG, WEBP / 8MB 이하만 가능합니다.`
-          );
+          throw new Error(`${file.name}: 파일 형식 또는 크기 오류`);
         }
 
         const form = new FormData();
@@ -125,14 +176,14 @@ export default function Admin() {
           body: form,
         });
 
-        const data = await r.json();
+        const result = await r.json();
 
         if (!r.ok) {
-          throw new Error(data.error || '사진 업로드 실패');
+          throw new Error(result.error || '사진 업로드 실패');
         }
 
         uploaded.push({
-          url: data.url,
+          url: result.url,
           alt: file.name.replace(/\.[^.]+$/, ''),
         });
       }
@@ -145,50 +196,52 @@ export default function Admin() {
     } finally {
       if (uploaded.length) {
         if (target === 'new') {
-          setNewImages(prev => [...prev, ...uploaded]);
+          setNewPhotos(prev => [...prev, ...uploaded]);
         } else {
-          setEditImages(prev => [...prev, ...uploaded]);
+          setEditPhotos(prev => [...prev, ...uploaded]);
         }
       }
-
       setUploading(false);
     }
   }
 
-  function moveImage(
+  function changePhotos(
+    target: PhotoTarget,
+    operation: 'move' | 'delete' | 'alt',
     index: number,
-    direction: number,
-    target: 'new' | 'edit'
+    value?: number | string
   ) {
-    const setter = target === 'new' ? setNewImages : setEditImages;
+    const setter = target === 'new' ? setNewPhotos : setEditPhotos;
 
     setter(prev => {
       const next = [...prev];
-      const other = index + direction;
 
-      if (other < 0 || other >= next.length) return prev;
+      if (operation === 'delete') {
+        next.splice(index, 1);
+      }
 
-      [next[index], next[other]] = [next[other], next[index]];
+      if (operation === 'alt') {
+        next[index] = { ...next[index], alt: String(value ?? '') };
+      }
+
+      if (operation === 'move') {
+        const other = index + Number(value);
+        if (other < 0 || other >= next.length) return prev;
+        [next[index], next[other]] = [next[other], next[index]];
+      }
+
       return next;
     });
   }
 
-  function removeImage(
-    index: number,
-    target: 'new' | 'edit'
-  ) {
-    const setter = target === 'new' ? setNewImages : setEditImages;
-    setter(prev => prev.filter((_, i) => i !== index));
-  }
-
-  function imageManager(target: 'new' | 'edit') {
-    const images = target === 'new' ? newImages : editImages;
+  function photoManager(target: PhotoTarget) {
+    const photos = target === 'new' ? newPhotos : editPhotos;
 
     return (
       <div style={{ marginTop: 16 }}>
-        <p>
-          <strong>사진 {images.length}/30장</strong>
-          {' · '}첫 번째 사진이 대표 이미지입니다.
+        <strong>사진 {photos.length}/30장</strong>
+        <p className="muted">
+          첫 번째 사진이 대표 이미지입니다.
         </p>
 
         <input
@@ -198,7 +251,7 @@ export default function Admin() {
           disabled={busy || uploading}
           onChange={e => {
             if (e.target.files?.length) {
-              uploadFiles(e.target.files, target);
+              void uploadFiles(e.target.files, target);
             }
             e.target.value = '';
           }}
@@ -206,94 +259,58 @@ export default function Admin() {
 
         {uploading && <p>사진 업로드 중...</p>}
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns:
-              'repeat(auto-fill, minmax(160px, 1fr))',
-            gap: 16,
-            marginTop: 20,
-          }}
-        >
-          {images.map((image, index) => (
-            <div
-              key={`${image.url}-${index}`}
-              style={{
-                border: '1px solid #ddd',
-                padding: 10,
-                borderRadius: 8,
-              }}
-            >
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))',
+          gap: 12,
+          marginTop: 16,
+        }}>
+          {photos.map((photo, index) => (
+            <div key={`${photo.url}-${index}`} style={{
+              padding: 10,
+              border: '1px solid #ddd',
+              borderRadius: 6,
+            }}>
               <img
-                src={image.url}
-                alt={image.alt}
+                src={photo.url}
+                alt={photo.alt}
                 style={{
                   width: '100%',
                   height: 120,
                   objectFit: 'cover',
-                  borderRadius: 4,
                 }}
               />
-
-              <p style={{ fontSize: 13 }}>
-                {index === 0
-                  ? '대표 사진'
-                  : `${index + 1}번 사진`}
+              <p>
+                {index === 0 ? '대표 사진' : `${index + 1}번 사진`}
               </p>
-
               <input
-                aria-label={`${index + 1}번 사진 설명`}
-                value={image.alt}
+                aria-label="사진 설명"
+                value={photo.alt}
                 maxLength={200}
-                onChange={e => {
-                  const setter =
-                    target === 'new' ? setNewImages : setEditImages;
-
-                  const value = e.target.value;
-
-                  setter(prev =>
-                    prev.map((item, i) =>
-                      i === index ? { ...item, alt: value } : item
-                    )
-                  );
-                }}
+                onChange={e =>
+                  changePhotos(target, 'alt', index, e.target.value)
+                }
               />
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 6,
-                  marginTop: 8,
-                }}
-              >
+              <div style={{
+                display: 'flex',
+                gap: 5,
+                marginTop: 8,
+              }}>
                 <button
                   type="button"
                   disabled={busy || uploading || index === 0}
-                  onClick={() => moveImage(index, -1, target)}
-                >
-                  ←
-                </button>
-
+                  onClick={() => changePhotos(target, 'move', index, -1)}
+                >←</button>
                 <button
                   type="button"
-                  disabled={
-                    busy ||
-                    uploading ||
-                    index === images.length - 1
-                  }
-                  onClick={() => moveImage(index, 1, target)}
-                >
-                  →
-                </button>
-
+                  disabled={busy || uploading || index === photos.length - 1}
+                  onClick={() => changePhotos(target, 'move', index, 1)}
+                >→</button>
                 <button
                   type="button"
                   disabled={busy || uploading}
-                  onClick={() => removeImage(index, target)}
-                  style={{ color: '#c62828' }}
-                >
-                  삭제
-                </button>
+                  onClick={() => changePhotos(target, 'delete', index)}
+                >삭제</button>
               </div>
             </div>
           ))}
@@ -302,40 +319,35 @@ export default function Admin() {
     );
   }
 
-  async function create(e: FormEvent<HTMLFormElement>) {
+  async function createProject(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy || uploading) return;
 
     const form = e.currentTarget;
-    const data = new FormData(form);
-
-    const payload = {
-      slug: String(data.get('slug')),
-      title: String(data.get('title')),
-      category: String(data.get('category')),
-      region: String(data.get('region') || ''),
-      description: String(data.get('description') || ''),
-      published: true,
-      images: newImages.map(({ url, alt }) => ({ url, alt })),
-    };
-
+    const f = new FormData(form);
     setBusy(true);
 
     try {
       const r = await fetch('/api/admin/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          slug: String(f.get('slug')),
+          title: String(f.get('title')),
+          category: String(f.get('category')),
+          region: String(f.get('region') || ''),
+          description: String(f.get('description') || ''),
+          published: true,
+          images: newPhotos.map(({ url, alt }) => ({ url, alt })),
+        }),
       });
 
-      if (!r.ok) {
-        throw new Error('등록 실패: 영문 주소 중복 등을 확인하세요.');
-      }
+      if (!r.ok) throw new Error('등록 실패: 영문 주소 중복 등을 확인하세요.');
 
-      setNewImages([]);
       form.reset();
+      setNewPhotos([]);
+      await loadData();
       setMessage('시공 사례 등록 완료');
-      await load();
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : '등록 실패'
@@ -347,29 +359,19 @@ export default function Admin() {
 
   function startEdit(project: Project) {
     setEditing(project);
-    setEditImages(
+    setEditPhotos(
       [...project.images].sort(
         (a, b) => (a.sort ?? 0) - (b.sort ?? 0)
       )
     );
-    setMessage('수정할 내용을 변경한 후 저장하세요.');
+    setMessage('내용을 수정하고 저장하세요.');
   }
 
   async function saveEdit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!editing || busy || uploading) return;
 
-    const data = new FormData(e.currentTarget);
-
-    const payload = {
-      slug: String(data.get('slug')),
-      title: String(data.get('title')),
-      category: String(data.get('category')),
-      region: String(data.get('region') || ''),
-      description: String(data.get('description') || ''),
-      images: editImages.map(({ url, alt }) => ({ url, alt })),
-    };
-
+    const f = new FormData(e.currentTarget);
     setBusy(true);
 
     try {
@@ -378,26 +380,32 @@ export default function Admin() {
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            slug: String(f.get('slug')),
+            title: String(f.get('title')),
+            category: String(f.get('category')),
+            region: String(f.get('region') || ''),
+            description: String(f.get('description') || ''),
+            images: editPhotos.map(({ url, alt }) => ({ url, alt })),
+          }),
         }
       );
 
       if (!r.ok) throw new Error('수정 저장 실패');
 
       setEditing(null);
-      setEditImages([]);
-      setMessage('시공 사례 및 사진 저장 완료');
-      await load();
+      setEditPhotos([]);
+      await loadData();
+      setMessage('시공 사례 수정 완료');
     } catch {
-      setMessage('수정 실패: 입력값과 영문 주소 중복을 확인하세요.');
+      setMessage('수정 실패: 입력값 또는 영문 주소 중복을 확인하세요.');
     } finally {
       setBusy(false);
     }
   }
 
-  async function togglePublished(project: Project) {
-    if (busy || uploading) return;
-
+  async function toggleProject(project: Project) {
+    if (busy) return;
     setBusy(true);
 
     try {
@@ -406,21 +414,14 @@ export default function Admin() {
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            published: !project.published,
-          }),
+          body: JSON.stringify({ published: !project.published }),
         }
       );
 
       if (!r.ok) throw new Error();
 
-      setMessage(
-        project.published
-          ? '비공개로 전환했습니다.'
-          : '공개로 전환했습니다.'
-      );
-
-      await load();
+      await loadData();
+      setMessage('공개 상태 변경 완료');
     } catch {
       setMessage('공개 상태 변경 실패');
     } finally {
@@ -428,16 +429,10 @@ export default function Admin() {
     }
   }
 
-  async function remove(project: Project) {
-    if (busy || uploading) return;
-
-    if (
-      !window.confirm(
-        `"${project.title}" 사례를 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.`
-      )
-    ) {
-      return;
-    }
+  async function deleteProject(project: Project) {
+    if (busy || !window.confirm(
+      `"${project.title}" 사례를 삭제하시겠습니까?`
+    )) return;
 
     setBusy(true);
 
@@ -451,26 +446,107 @@ export default function Admin() {
 
       if (editing?.id === project.id) {
         setEditing(null);
-        setEditImages([]);
+        setEditPhotos([]);
       }
 
+      await loadData();
       setMessage('시공 사례 삭제 완료');
-      await load();
     } catch {
-      setMessage('삭제 실패');
+      setMessage('시공 사례 삭제 실패');
     } finally {
       setBusy(false);
     }
   }
 
-  return (
-    <main className="section wrap">
-      <div className="eyebrow">PRIVATE DASHBOARD</div>
-      <h2>관리자 페이지 V3</h2>
+  async function changeInquiryStatus(id: string, status: string) {
+    if (busy) return;
+    setBusy(true);
 
-      {!authorized ? (
+    try {
+      const r = await fetch(
+        `/api/admin/inquiries/${encodeURIComponent(id)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        }
+      );
+
+      if (!r.ok) throw new Error();
+
+      await loadData();
+      setMessage('문의 처리 상태 변경 완료');
+    } catch {
+      setMessage('문의 상태 변경 실패');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteInquiry(inquiry: Inquiry) {
+    if (busy || !window.confirm(
+      `${inquiry.name}님의 문의를 영구 삭제하시겠습니까?`
+    )) return;
+
+    setBusy(true);
+
+    try {
+      const r = await fetch(
+        `/api/admin/inquiries/${encodeURIComponent(inquiry.id)}`,
+        { method: 'DELETE' }
+      );
+
+      if (!r.ok) throw new Error();
+
+      await loadData();
+      setMessage('문의 삭제 완료');
+    } catch {
+      setMessage('문의 삭제 실패');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const newCount = inquiries.filter(
+    i => i.status === 'NEW'
+  ).length;
+
+  const publishedCount = projects.filter(
+    p => p.published
+  ).length;
+
+  const filteredInquiries = inquiries.filter(i => {
+    const keyword = search.toLowerCase();
+
+    const matchesSearch = [
+      i.name,
+      i.phone,
+      i.region,
+      i.category,
+      i.dimensions,
+      i.message,
+    ].some(v => (v || '').toLowerCase().includes(keyword));
+
+    return matchesSearch &&
+      (statusFilter === 'ALL' || i.status === statusFilter);
+  });
+
+  if (checking) {
+    return (
+      <main className="section wrap">
+        <h2>관리자 확인 중...</h2>
+      </main>
+    );
+  }
+
+  if (!authorized) {
+    return (
+      <main className="section wrap">
+        <div className="eyebrow">PRIVATE DASHBOARD</div>
+        <h2>관리자 로그인</h2>
+
         <form className="form" onSubmit={login}>
-          <label>관리자 이메일</label>
+          <label>이메일</label>
           <input
             type="email"
             value={email}
@@ -487,12 +563,117 @@ export default function Admin() {
           />
 
           <button className="cta" disabled={busy}>
-            {busy ? '로그인 중...' : '로그인'}
+            로그인
           </button>
         </form>
-      ) : (
+
+        <p className="status" role="status">{message}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="section wrap">
+      <div className="eyebrow">AIGEN COMMS ADMIN</div>
+      <h2>관리자 대시보드 V4</h2>
+
+      <nav style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 10,
+        margin: '24px 0',
+      }}>
+        {([
+          ['dashboard', '대시보드'],
+          ['projects', '시공 사례 관리'],
+          ['inquiries', `견적 문의 관리 (${newCount})`],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            style={{
+              ...buttonStyle,
+              background: tab === key ? '#111' : '#fff',
+              color: tab === key ? '#fff' : '#111',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+
+        <button
+          type="button"
+          style={buttonStyle}
+          disabled={busy}
+          onClick={() => void loadData()}
+        >
+          새로고침
+        </button>
+      </nav>
+
+      {tab === 'dashboard' && (
         <>
-          <form className="form" onSubmit={create}>
+          <h3>전체 운영 현황</h3>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))',
+            gap: 16,
+            marginTop: 20,
+          }}>
+            {[
+              ['전체 시공 사례', projects.length],
+              ['공개 사례', publishedCount],
+              ['전체 견적 문의', inquiries.length],
+              ['신규 문의', newCount],
+            ].map(([label, value]) => (
+              <div key={label} style={{
+                padding: 24,
+                border: '1px solid #ddd',
+                borderRadius: 8,
+              }}>
+                <p className="muted">{label}</p>
+                <strong style={{ fontSize: 32 }}>{value}</strong>
+              </div>
+            ))}
+          </div>
+
+          <h3 style={{ marginTop: 36 }}>최근 견적 문의</h3>
+
+          {inquiries.length === 0 ? (
+            <p>접수된 문의가 없습니다.</p>
+          ) : (
+            inquiries.slice(0, 5).map(i => (
+              <div key={i.id} style={{
+                padding: '14px 0',
+                borderBottom: '1px solid #ddd',
+              }}>
+                <strong>{i.name}</strong>
+                {' · '}
+                {i.category || '종류 미입력'}
+                {' · '}
+                {statusNames[i.status] || i.status}
+                <div className="muted">
+                  {new Date(i.createdAt).toLocaleString('ko-KR')}
+                </div>
+              </div>
+            ))
+          )}
+
+          <button
+            type="button"
+            style={{ ...buttonStyle, marginTop: 20 }}
+            onClick={() => setTab('inquiries')}
+          >
+            전체 문의 관리하기
+          </button>
+        </>
+      )}
+
+      {tab === 'projects' && (
+        <>
+          <form className="form" onSubmit={createProject}>
             <h3>시공 사례 신규 등록</h3>
 
             <label>영문 주소 (slug)</label>
@@ -504,104 +685,79 @@ export default function Admin() {
             />
 
             <label>프로젝트명</label>
-            <input
-              name="title"
-              required
-              minLength={2}
-              maxLength={150}
-            />
+            <input name="title" required minLength={2} maxLength={150} />
 
             <label>간판 종류</label>
             <select name="category">
-              {categories.map(c => (
-                <option key={c}>{c}</option>
-              ))}
+              {categories.map(c => <option key={c}>{c}</option>)}
             </select>
 
             <label>시공 지역</label>
             <input name="region" maxLength={100} />
 
             <label>시공 설명</label>
-            <textarea
-              name="description"
-              maxLength={5000}
-            />
+            <textarea name="description" maxLength={5000} />
 
-            <h4>시공 사진 등록</h4>
-            {imageManager('new')}
+            <h4>시공 사진</h4>
+            {photoManager('new')}
 
             <button
               className="cta"
               disabled={busy || uploading}
               style={{ marginTop: 20 }}
             >
-              {busy ? '등록 중...' : '시공 사례 등록'}
+              시공 사례 등록
             </button>
           </form>
 
-          <h3 style={{ marginTop: 40 }}>등록된 사례</h3>
+          <h3 style={{ marginTop: 40 }}>
+            등록된 사례 ({projects.length})
+          </h3>
 
-          <div className="admin-list">
-            {items.length === 0 && (
-              <p>등록된 시공 사례가 없습니다.</p>
-            )}
+          {projects.map(project => (
+            <div key={project.id} style={{
+              padding: '20px 0',
+              borderBottom: '1px solid #ddd',
+            }}>
+              <strong>{project.title}</strong>
 
-            {items.map(project => (
-              <div
-                className="admin-row"
-                key={project.id}
-                style={{
-                  padding: '20px 0',
-                  borderBottom: '1px solid #ddd',
-                }}
-              >
-                <strong>{project.title}</strong>
+              <p>
+                {project.category}
+                {' · '}
+                {project.region || '지역 미입력'}
+                {' · '}
+                {project.published ? '공개' : '비공개'}
+                {' · '}
+                사진 {project.images.length}장
+              </p>
 
-                <p>
-                  {project.category} · {project.region || '지역 미입력'}
-                  {' · '}
-                  {project.published ? '공개' : '비공개'}
-                  {' · '}
-                  사진 {project.images.length}장
-                </p>
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+              }}>
+                <button
+                  type="button"
+                  disabled={busy || uploading}
+                  onClick={() => startEdit(project)}
+                >수정</button>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 8,
-                  }}
+                <button
+                  type="button"
+                  disabled={busy || uploading}
+                  onClick={() => void toggleProject(project)}
                 >
-                  <button
-                    type="button"
-                    disabled={busy || uploading}
-                    onClick={() => startEdit(project)}
-                  >
-                    수정
-                  </button>
+                  {project.published ? '비공개 전환' : '공개 전환'}
+                </button>
 
-                  <button
-                    type="button"
-                    disabled={busy || uploading}
-                    onClick={() => togglePublished(project)}
-                  >
-                    {project.published
-                      ? '비공개 전환'
-                      : '공개 전환'}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={busy || uploading}
-                    onClick={() => remove(project)}
-                    style={{ color: '#c62828' }}
-                  >
-                    삭제
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  disabled={busy || uploading}
+                  onClick={() => void deleteProject(project)}
+                >삭제</button>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
 
           {editing && (
             <form
@@ -637,9 +793,7 @@ export default function Admin() {
                 {!categories.includes(editing.category) && (
                   <option>{editing.category}</option>
                 )}
-                {categories.map(c => (
-                  <option key={c}>{c}</option>
-                ))}
+                {categories.map(c => <option key={c}>{c}</option>)}
               </select>
 
               <label>시공 지역</label>
@@ -656,19 +810,16 @@ export default function Admin() {
                 maxLength={5000}
               />
 
-              <h4>사진 추가·삭제·순서 변경</h4>
-              {imageManager('edit')}
+              <h4>사진 관리</h4>
+              {photoManager('edit')}
 
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 10,
-                  marginTop: 20,
-                }}
-              >
+              <div style={{
+                display: 'flex',
+                gap: 10,
+                marginTop: 20,
+              }}>
                 <button
                   className="cta"
-                  type="submit"
                   disabled={busy || uploading}
                 >
                   변경사항 저장
@@ -679,7 +830,7 @@ export default function Admin() {
                   disabled={busy || uploading}
                   onClick={() => {
                     setEditing(null);
-                    setEditImages([]);
+                    setEditPhotos([]);
                   }}
                 >
                   취소
@@ -690,7 +841,155 @@ export default function Admin() {
         </>
       )}
 
-      <p className="status" role="status">
+      {tab === 'inquiries' && (
+        <>
+          <h3>견적 문의 관리</h3>
+          <p className="muted">
+            전체 {inquiries.length}건 · 신규 {newCount}건
+          </p>
+
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 10,
+            margin: '20px 0',
+          }}>
+            <input
+              aria-label="문의 검색"
+              placeholder="고객명, 전화번호, 지역 검색"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ padding: 12, flex: 1, minWidth: 200 }}
+            />
+
+            <select
+              aria-label="처리 상태 필터"
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              style={{ padding: 12 }}
+            >
+              <option value="ALL">전체 상태</option>
+              <option value="NEW">신규</option>
+              <option value="IN_PROGRESS">상담 중</option>
+              <option value="DONE">완료</option>
+            </select>
+          </div>
+
+          {filteredInquiries.length === 0 && (
+            <p>조건에 맞는 문의가 없습니다.</p>
+          )}
+
+          {filteredInquiries.map(inquiry => (
+            <article key={inquiry.id} style={{
+              border: '1px solid #ddd',
+              borderRadius: 8,
+              padding: 22,
+              marginBottom: 16,
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 10,
+              }}>
+                <h4>{inquiry.name}</h4>
+                <strong>
+                  {statusNames[inquiry.status] || inquiry.status}
+                </strong>
+              </div>
+
+              <p className="muted">
+                접수일: {new Date(inquiry.createdAt).toLocaleString('ko-KR')}
+              </p>
+
+              <p>
+                <strong>연락처:</strong>{' '}
+                <a href={`tel:${inquiry.phone}`}>
+                  {inquiry.phone}
+                </a>
+              </p>
+
+              <p>
+                <strong>시공 지역:</strong>{' '}
+                {inquiry.region || '미입력'}
+              </p>
+
+              <p>
+                <strong>간판 종류:</strong>{' '}
+                {inquiry.category || '미입력'}
+              </p>
+
+              <p>
+                <strong>제작 규격:</strong>{' '}
+                {inquiry.dimensions || '미입력'}
+              </p>
+
+              <div style={{
+                background: '#f5f5f5',
+                padding: 16,
+                margin: '16px 0',
+                borderRadius: 6,
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere',
+              }}>
+                <strong>문의 내용</strong>
+                <p>{inquiry.message}</p>
+              </div>
+
+              <label htmlFor={`status-${inquiry.id}`}>
+                처리 상태
+              </label>
+
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 10,
+                marginTop: 8,
+              }}>
+                <select
+                  id={`status-${inquiry.id}`}
+                  value={inquiry.status}
+                  disabled={busy}
+                  onChange={e =>
+                    void changeInquiryStatus(
+                      inquiry.id,
+                      e.target.value
+                    )
+                  }
+                  style={{ padding: 10 }}
+                >
+                  {!statusNames[inquiry.status] && (
+                    <option value={inquiry.status}>
+                      {inquiry.status}
+                    </option>
+                  )}
+                  <option value="NEW">신규</option>
+                  <option value="IN_PROGRESS">상담 중</option>
+                  <option value="DONE">완료</option>
+                </select>
+
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void deleteInquiry(inquiry)}
+                  style={{ color: '#c62828' }}
+                >
+                  문의 삭제
+                </button>
+              </div>
+            </article>
+          ))}
+        </>
+      )}
+
+      <p
+        className="status"
+        role="status"
+        style={{
+          marginTop: 24,
+          whiteSpace: 'pre-wrap',
+        }}
+      >
         {message}
       </p>
     </main>
