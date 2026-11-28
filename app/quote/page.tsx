@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import Link from 'next/link';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
@@ -18,14 +18,88 @@ const categories = [
   '기타',
 ];
 
+type SelectedPhoto = { id: string; file: File; preview: string };
+const MAX_PHOTOS = 5;
+const MAX_ORIGINAL = 25 * 1024 * 1024;
+const MAX_COMPRESSED = 2 * 1024 * 1024;
+
+async function compressPhoto(file: File): Promise<File> {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error('지원하지 않는 사진 형식입니다. JPG 또는 PNG로 다시 선택해 주세요.'));
+    });
+    const ratio = Math.min(1, 1920 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * ratio));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * ratio));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('이미지를 처리할 수 없습니다.');
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    for (const quality of [0.8, 0.7, 0.6, 0.5]) {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', quality));
+      if (!blob || blob.type !== 'image/webp') throw new Error('이 브라우저는 WebP 변환을 지원하지 않습니다.');
+      if (blob.size <= MAX_COMPRESSED) {
+        return new File([blob], `${crypto.randomUUID()}.webp`, { type: 'image/webp' });
+      }
+    }
+    throw new Error('압축 후에도 사진이 2MB를 초과합니다. 다른 사진을 선택해 주세요.');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export default function Quote() {
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState('');
+  const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
+  const [processing, setProcessing] = useState(false);
+
+  async function selectPhotos(e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    if (photos.length + files.length > MAX_PHOTOS) {
+      setStatus('error');
+      setMessage(`사진은 최대 ${MAX_PHOTOS}장까지 첨부할 수 있습니다.`);
+      return;
+    }
+    setProcessing(true);
+    setMessage('사진을 압축하고 있습니다...');
+    try {
+      const additions: SelectedPhoto[] = [];
+      for (const file of files) {
+        if (!file.type.startsWith('image/') && !/\.(heic|heif)$/i.test(file.name)) {
+          throw new Error('사진 파일만 첨부할 수 있습니다.');
+        }
+        if (file.size > MAX_ORIGINAL) throw new Error('원본 사진은 장당 25MB 이하여야 합니다.');
+        const compressed = await compressPhoto(file);
+        additions.push({ id: crypto.randomUUID(), file: compressed, preview: URL.createObjectURL(compressed) });
+      }
+      setPhotos((prev) => [...prev, ...additions]);
+      setStatus('idle');
+      setMessage('');
+    } catch (error) {
+      setStatus('error');
+      setMessage(error instanceof Error ? error.message : '사진을 처리하지 못했습니다.');
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  function removePhoto(id: string) {
+    const item = photos.find((photo) => photo.id === id);
+    if (item) URL.revokeObjectURL(item.preview);
+    setPhotos((prev) => prev.filter((photo) => photo.id !== id));
+  }
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (status === 'loading') return;
+    if (status === 'loading' || processing) return;
 
     const form = e.currentTarget;
     const f = new FormData(form);
@@ -58,15 +132,38 @@ export default function Quote() {
     }
 
     setStatus('loading');
-    setMessage('견적 문의를 접수하고 있습니다...');
+    setMessage('견적 문의를 준비하고 있습니다...');
 
     try {
+      const attachmentKeys: string[] = [];
+      for (let i = 0; i < photos.length; i++) {
+        setMessage(`사진 업로드 중... (${i + 1}/${photos.length})`);
+        const photo = photos[i];
+        const signResponse = await fetch('/api/inquiries/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ size: photo.file.size, type: 'image/webp' }),
+        });
+        if (!signResponse.ok) throw new Error('사진 업로드 주소를 발급받지 못했습니다.');
+        const signed = await signResponse.json();
+        if (typeof signed.uploadUrl !== 'string' || typeof signed.key !== 'string') {
+          throw new Error('사진 업로드 응답이 올바르지 않습니다.');
+        }
+        const uploadResponse = await fetch(signed.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'image/webp' },
+          body: photo.file,
+        });
+        if (!uploadResponse.ok) throw new Error('사진 업로드에 실패했습니다.');
+        attachmentKeys.push(signed.key);
+      }
+      setMessage('견적 문의를 접수하고 있습니다...');
       const r = await fetch('/api/inquiries', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, attachmentKeys }),
       });
 
       if (r.status === 400) {
@@ -82,9 +179,11 @@ export default function Quote() {
       setStatus('success');
       setMessage('견적 문의가 정상적으로 접수되었습니다. 확인 후 연락드리겠습니다.');
       form.reset();
+      photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
+      setPhotos([]);
     } catch {
       setStatus('error');
-      setMessage('일시적으로 접수가 어렵습니다. 잠시 후 다시 시도해 주세요.');
+      setMessage('접수에 실패했습니다. 사진과 입력 내용을 유지했으니 잠시 후 다시 시도해 주세요.');
     }
   }
 
@@ -296,6 +395,47 @@ export default function Quote() {
                 </div>
               </div>
 
+              <div className="quote-form-section">
+                <div className="quote-form-section-title">
+                  <span>04</span>
+                  <h3>현장 사진 첨부</h3>
+                </div>
+                <div className="quote-field">
+                  <label htmlFor="quote-photos">현장 사진 / 참고 이미지 (선택)</label>
+                  <p style={{ color: '#777', fontSize: 13, lineHeight: 1.8, marginBottom: 14 }}>
+                    기존 간판, 설치할 외벽, 참고 디자인 등을 첨부해 주세요.<br />
+                    최대 5장 · 자동 압축 · 사진당 최대 2MB로 저장됩니다.
+                  </p>
+                  <input
+                    id="quote-photos"
+                    type="file"
+                    accept="image/*,.heic,.heif"
+                    multiple
+                    onChange={selectPhotos}
+                    disabled={processing || status === 'loading' || photos.length >= MAX_PHOTOS}
+                    style={{ padding: '14px', border: '1px dashed #aaa', width: '100%', boxSizing: 'border-box' }}
+                  />
+                  <small>{processing ? '사진을 압축하는 중입니다...' : `선택된 사진 ${photos.length} / ${MAX_PHOTOS}장`}</small>
+                  {photos.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 12, marginTop: 16 }}>
+                      {photos.map((photo) => (
+                        <div key={photo.id} style={{ position: 'relative' }}>
+                          <img src={photo.preview} alt="첨부 사진 미리보기" style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block' }} />
+                          <button
+                            type="button"
+                            onClick={() => removePhoto(photo.id)}
+                            disabled={processing || status === 'loading'}
+                            aria-label="사진 삭제"
+                            style={{ position: 'absolute', right: 5, top: 5, border: 0, background: '#171717', color: '#fff', padding: '4px 8px', cursor: 'pointer' }}
+                          >×</button>
+                          <small style={{ display: 'block', marginTop: 5 }}>{(photo.file.size / 1024).toFixed(0)}KB</small>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="quote-privacy">
                 <label>
                   <input type="checkbox" required />
@@ -318,7 +458,7 @@ export default function Quote() {
               <button
                 className="quote-submit"
                 type="submit"
-                disabled={status === 'loading'}
+                disabled={status === 'loading' || processing}
               >
                 <span>
                   {status === 'loading'
