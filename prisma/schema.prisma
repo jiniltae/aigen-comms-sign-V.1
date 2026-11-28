@@ -42,3 +42,26 @@ model Inquiry {
   status         String   @default("NEW")
   createdAt      DateTime @default(now())
 }
+
+model InquiryUploadSession {
+  id          String    @id @default(cuid())
+  tokenHash   String    @unique
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  submittedAt DateTime?
+  uploads     InquiryUpload[]
+
+  @@index([expiresAt])
+}
+
+model InquiryUpload {
+  id         String               @id @default(cuid())
+  sessionId  String
+  session    InquiryUploadSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  objectKey  String               @unique
+  fileSize   Int
+  status     String               @default("PENDING")
+  createdAt  DateTime             @default(now())
+
+  @@index([sessionId])
+}
