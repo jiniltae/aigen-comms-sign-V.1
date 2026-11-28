@@ -1,6 +1,11 @@
 
+
 import Link from 'next/link';
-import { samples, categories } from '@/lib/data';
+import { db } from '@/lib/db';
+import { categories } from '@/lib/data';
+
+export const dynamic = 'force-dynamic';
+
 
 export default function Home() {
   return (
