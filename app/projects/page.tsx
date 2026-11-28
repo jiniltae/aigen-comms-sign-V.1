@@ -109,6 +109,11 @@ export default async function Projects({
             ))}
           </nav>
 
+          <div className="portfolio-result-summary" aria-live="polite">
+            <span>{activeCategory === '전체' ? 'ALL PROJECTS' : activeCategory}</span>
+            <strong>{String(items.length).padStart(2, '0')} RESULTS</strong>
+          </div>
+
           {loadError ? (
             <div className="portfolio-empty">
               <h2>프로젝트를 불러오지 못했습니다.</h2>
