@@ -19,9 +19,13 @@ export default async function Home() {
 
   try {
     const rows = await db.project.findMany({
-      where: {
-        published: true,
-      },
+where: {
+  published: true,
+  images: {
+    some: {},
+  },
+},
+
       include: {
         images: {
           orderBy: {
