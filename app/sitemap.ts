@@ -9,8 +9,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absoluteUrl('/quote'), changeFrequency: 'monthly', priority: 0.7 },
   ];
   try {
-    const projects = await db.project.findMany({ where: { published: true }, select: { slug: true, createdAt: true } });
-    for (const project of projects) pages.push({ url: absoluteUrl(`/projects/${encodeURIComponent(project.slug)}`), lastModified: project.createdAt, changeFrequency: 'monthly', priority: 0.8 });
+    const projects = await db.project.findMany({ where: { published: true }, select: { slug: true, updatedAt: true } });
+    for (const project of projects) pages.push({ url: absoluteUrl(`/projects/${encodeURIComponent(project.slug)}`), lastModified: project.updatedAt, changeFrequency: 'monthly', priority: 0.8 });
   } catch (error) { console.error('Sitemap project query failed:', error); }
   return pages;
 }
