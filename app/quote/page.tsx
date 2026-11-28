@@ -136,6 +136,13 @@ export default function Quote() {
 
     try {
       const attachmentKeys: string[] = [];
+      if (photos.length > 0) {
+        const sessionResponse = await fetch('/api/inquiries/session', { method: 'POST' });
+        if (!sessionResponse.ok) {
+          const sessionError = await sessionResponse.json().catch(() => ({}));
+          throw new Error(sessionError.error || '사진 업로드 세션을 생성하지 못했습니다.');
+        }
+      }
       for (let i = 0; i < photos.length; i++) {
         setMessage(`사진 업로드 중... (${i + 1}/${photos.length})`);
         const photo = photos[i];
